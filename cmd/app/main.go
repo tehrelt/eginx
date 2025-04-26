@@ -5,6 +5,8 @@ import (
 	"flag"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/tehrelt/eginx/internal/config"
 	"github.com/tehrelt/eginx/internal/pool"
@@ -20,6 +22,7 @@ func init() {
 
 func main() {
 	flag.Parse()
+	ctx := context.Background()
 
 	l := slog.New(
 		slog.NewTextHandler(
@@ -29,14 +32,22 @@ func main() {
 	)
 	slog.SetDefault(l)
 
-	ctx := context.Background()
-
-	cfg, err := config.Parse(configPath)
+	cfg, err := config.Parse(ctx, configPath)
 	if err != nil {
 		panic(err)
 	}
 
+	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	pool := pool.New(cfg, slog.With(slog.Int("worker", 1)))
+	go func() {
+		pool.Run(ctx)
+	}()
 
-	pool.Run(ctx)
+	<-ctx.Done()
+	ctx = context.Background()
+
+	if err := pool.Shutdown(ctx); err != nil {
+		panic(err)
+	}
+
 }

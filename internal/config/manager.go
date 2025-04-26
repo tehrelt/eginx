@@ -1,36 +1,27 @@
 package config
 
 import (
-	"bytes"
-	"crypto/sha256"
-	"io"
+	"context"
 	"log/slog"
 	"os"
 	"time"
 )
 
 type Manager struct {
-	lastHash []byte
-	path     string
-	config   *Config
-	timeout  time.Duration
-	changed  chan struct{}
+	path    string
+	config  *Config
+	timeout time.Duration
+	stat    os.FileInfo
 }
 
-func (m *Manager) Changed() <-chan struct{} {
-	return m.changed
-}
-
-func newManager(config *Config, timeout time.Duration, path string) *Manager {
+func newManager(ctx context.Context, config *Config, timeout time.Duration, path string) *Manager {
 	m := &Manager{
 		config:  config,
 		timeout: timeout,
 		path:    path,
-		changed: make(chan struct{}, 1),
 	}
-	m.lastHash, _ = m.hash()
 
-	go m.HandleChange()
+	m.stat, _ = os.Stat(path)
 
 	return m
 }
@@ -39,38 +30,41 @@ func (m *Manager) Config() *Config {
 	return m.config
 }
 
-func (m *Manager) HandleChange() {
+func (m *Manager) Watch(ctx context.Context) <-chan struct{} {
 	t := time.NewTicker(m.timeout)
+	ch := make(chan struct{}, 1)
 
-	for range t.C {
-		hash, err := m.hash()
-		if err != nil {
-			slog.Error("failed to get hash", slog.String("err", err.Error()))
-			continue
+	go func() {
+		defer close(ch)
+
+		for {
+			select {
+			case <-ctx.Done():
+				slog.Info("stopping file watcher")
+				return
+
+			case <-t.C:
+				stat, err := os.Stat(m.path)
+				if err != nil {
+					slog.Warn("error checking config file", slog.String("error", err.Error()))
+					continue
+				}
+
+				if !stat.ModTime().Equal(m.stat.ModTime()) || stat.Size() != m.stat.Size() {
+					m.stat = stat
+					slog.Debug("config file changed, reloading...")
+					m.config.reload(m.path)
+					select {
+					case <-ctx.Done():
+						slog.Info("stopping file watcher")
+						return
+					case ch <- struct{}{}:
+						slog.Debug("config changed")
+					}
+				}
+			}
 		}
+	}()
 
-		if !bytes.Equal(m.lastHash, hash) {
-			slog.Debug("config changed, reloading...")
-			m.lastHash = hash
-			m.config.reload(m.path)
-			m.changed <- struct{}{}
-		}
-
-	}
-}
-
-func (m *Manager) hash() ([]byte, error) {
-	file, err := os.Open(m.path)
-	if err != nil {
-		slog.Error("failed to open file", slog.String("err", err.Error()))
-		return nil, err
-	}
-	defer file.Close()
-
-	hasher := sha256.New()
-	if _, err := io.Copy(hasher, file); err != nil {
-		return nil, err
-	}
-
-	return hasher.Sum(nil), nil
+	return ch
 }

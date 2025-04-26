@@ -1,32 +1,45 @@
 package pool
 
-import "sync"
+import (
+	"log/slog"
+	"sync"
+)
 
 type serverIterator struct {
-	buf []*Server
+	buf []*server
 	x   int
 	m   sync.Mutex
 }
 
-func newServerIterator(servers []*Server) *serverIterator {
+func newServerIterator(servers []*server) *serverIterator {
 	return &serverIterator{
 		buf: servers,
 		x:   0,
 	}
 }
 
-func (si *serverIterator) Next() (*Server, bool) {
+func (si *serverIterator) Next() (server *server, ok bool) {
 	si.m.Lock()
 	defer si.m.Unlock()
-	var server *Server
+
+	start := si.x
+	if len(si.buf) == 0 {
+		return nil, false
+	}
 
 	for server == nil {
 		s := si.buf[si.x]
 		if s.Alive() {
 			server = s
+		} else {
+			slog.Debug("server not alive", slog.String("addr", s.URL.String()))
 		}
 
 		si.Inc()
+		if si.x == start && server == nil {
+			slog.Debug("si.x equals start point and server still nil")
+			return nil, false
+		}
 	}
 
 	return server, true
@@ -39,7 +52,7 @@ func (si *serverIterator) Inc() {
 	}
 }
 
-func (si *serverIterator) Set(s []*Server) {
+func (si *serverIterator) Set(s []*server) {
 	si.m.Lock()
 	defer si.m.Unlock()
 

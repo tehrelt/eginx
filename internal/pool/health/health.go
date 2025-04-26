@@ -1,6 +1,7 @@
 package health
 
 import (
+	"context"
 	"log/slog"
 	"net"
 	"net/url"
@@ -23,13 +24,13 @@ type HealthChecker struct {
 	logger  *slog.Logger
 }
 
-func New(target *url.URL, opts ...HealthCheckerOption) *HealthChecker {
+func New(ctx context.Context, target *url.URL, opts ...HealthCheckerOption) *HealthChecker {
 	hc := &HealthChecker{
 		target:  target,
 		period:  defaultPeriod,
 		timeout: defaultTimeout,
 		cancel:  make(chan struct{}),
-		logger:  slog.With(slog.String("target", target.Host)),
+		logger:  slog.With(slog.String("target", target.Host), slog.String("struct", "HeatlhChecker")),
 	}
 
 	for _, opt := range opts {
@@ -38,7 +39,7 @@ func New(target *url.URL, opts ...HealthCheckerOption) *HealthChecker {
 
 	hc.check()
 
-	go hc.run()
+	go hc.run(ctx)
 
 	return hc
 }
@@ -46,10 +47,10 @@ func New(target *url.URL, opts ...HealthCheckerOption) *HealthChecker {
 func (hc *HealthChecker) check() {
 	hc.m.Lock()
 	defer hc.m.Unlock()
-
 	defer func() {
 		hc.logger.Debug("checked health", slog.Bool("alive", hc.alive))
 	}()
+
 	conn, err := net.DialTimeout("tcp", hc.target.Host, hc.timeout)
 	if err != nil {
 		hc.alive = false
@@ -60,17 +61,21 @@ func (hc *HealthChecker) check() {
 	hc.alive = true
 }
 
-func (hc *HealthChecker) run() {
+func (hc *HealthChecker) run(ctx context.Context) {
 	ticker := time.NewTicker(hc.period)
 	hc.logger.Info("starting health checker", slog.Float64("period", hc.period.Seconds()))
 
 	for {
 		select {
+		case <-ctx.Done():
+			hc.Stop()
+			ticker.Stop()
+			return
+
 		case <-ticker.C:
 			hc.check()
 		case <-hc.cancel:
 			ticker.Stop()
-			return
 		}
 
 	}
@@ -80,6 +85,7 @@ func (hc *HealthChecker) Stop() {
 	hc.m.Lock()
 	defer hc.m.Unlock()
 
+	hc.logger.Info("health checker stopped")
 	hc.cancel <- struct{}{}
 	close(hc.cancel)
 }

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/url"
@@ -24,13 +25,13 @@ func (c *Config) reload(path string) error {
 	return nil
 }
 
-func Parse(path string) (*Manager, error) {
+func Parse(ctx context.Context, path string) (*Manager, error) {
 	cfg, err := parse(path)
 	if err != nil {
 		return nil, err
 	}
 
-	return newManager(cfg, time.Second, path), nil
+	return newManager(ctx, cfg, time.Second, path), nil
 }
 
 func parse(filePath string) (cfg *Config, err error) {

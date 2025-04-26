@@ -63,19 +63,19 @@ func (hc *HealthChecker) check() {
 
 func (hc *HealthChecker) run(ctx context.Context) {
 	ticker := time.NewTicker(hc.period)
+	defer ticker.Stop()
+
 	hc.logger.Info("starting health checker", slog.Float64("period", hc.period.Seconds()))
 
 	for {
 		select {
 		case <-ctx.Done():
 			hc.Stop()
-			ticker.Stop()
 			return
-
 		case <-ticker.C:
 			hc.check()
 		case <-hc.cancel:
-			ticker.Stop()
+			return
 		}
 
 	}

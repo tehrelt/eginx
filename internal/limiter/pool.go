@@ -11,19 +11,26 @@ type KeyStorage interface {
 type LimiterCreatorFn func(ctx context.Context, ratePerSec int) Limiter
 
 type limiterPool struct {
-	ctx     context.Context
-	pool    map[string]Limiter
-	storage KeyStorage
-	create  LimiterCreatorFn
+	ctx            context.Context
+	pool           map[string]Limiter
+	storage        KeyStorage
+	create         LimiterCreatorFn
+	defaultLimiter Limiter
 }
 
-func NewLimiterPool(ctx context.Context, storage KeyStorage, create LimiterCreatorFn) *limiterPool {
-	return &limiterPool{
+type LimiterPoolOpt func(*limiterPool)
+
+func NewLimiterPool(ctx context.Context, storage KeyStorage, create LimiterCreatorFn, opts ...LimiterPoolOpt) *limiterPool {
+	lp := &limiterPool{
 		ctx:     ctx,
 		pool:    make(map[string]Limiter),
 		storage: storage,
 		create:  create,
 	}
+	for _, opt := range opts {
+		opt(lp)
+	}
+	return lp
 }
 
 func (lp *limiterPool) Allow(ctx context.Context, key string) bool {
@@ -40,7 +47,10 @@ func (lp *limiterPool) get(ctx context.Context, key string) Limiter {
 	if !ok {
 		rate, err := lp.storage.Get(ctx, key)
 		if err != nil {
-			return nil
+			if lp.defaultLimiter == nil {
+				return nil
+			}
+			return lp.defaultLimiter
 		}
 
 		limiter = lp.create(lp.ctx, rate)

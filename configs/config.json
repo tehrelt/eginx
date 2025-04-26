@@ -1,4 +1,5 @@
 {
+    "version": "0.0.1",
     "port": 8080,
     "targets": [
         "http://localhost:5000",
@@ -6,5 +7,8 @@
         "http://localhost:5002",
         "http://localhost:5003"
     ],
-    "version": "0.0.1"
+    "limiter": {
+        "enabled": true,
+        "defaultRPS": 1
+    }
 }

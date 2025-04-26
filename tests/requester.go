@@ -11,11 +11,13 @@ import (
 var (
 	count  int
 	target string
+	key    string
 )
 
 func init() {
 	flag.IntVar(&count, "count", 0, "")
 	flag.StringVar(&target, "target", "", "")
+	flag.StringVar(&key, "key", "", "")
 }
 
 func main() {
@@ -26,10 +28,11 @@ func main() {
 	}
 
 	counter := make(map[int]int)
+	counter[0] = 0
 	mutex := sync.Mutex{}
 	wg := sync.WaitGroup{}
 
-	workersCount := 25
+	workersCount := 4
 	ch := make(chan struct{}, workersCount)
 
 	for i := range workersCount {
@@ -40,9 +43,25 @@ func main() {
 			for range ch {
 				l.Info("requesting", slog.String("target", target))
 
-				response, err := http.Get(target)
+				req, err := http.NewRequest(http.MethodGet, target, nil)
+				if err != nil {
+					l.Error("failed compose request", slog.String("error", err.Error()))
+					continue
+				}
+
+				req.Header.Set("X-API-Key", key)
+
+				response, err := http.DefaultClient.Do(req)
 				if err != nil {
 					l.Error("failed request", slog.String("error", err.Error()))
+					continue
+				}
+
+				if response.StatusCode != http.StatusOK {
+					l.Error("failed request", slog.Int("status", response.StatusCode))
+					v := counter[0] + 1
+					counter[0] = v
+
 					continue
 				}
 

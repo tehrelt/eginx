@@ -13,6 +13,10 @@ type Config struct {
 	Port    int      `json:"port"`
 	Targets []string `json:"targets"`
 	Version string   `json:"version"`
+	Limiter struct {
+		Enabled    bool `json:"enabled"`
+		DefaultRPS int  `json:"defaultRPS"`
+	} `json:"limiter"`
 }
 
 func (c *Config) reload(path string) error {

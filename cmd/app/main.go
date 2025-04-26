@@ -62,16 +62,36 @@ func main() {
 	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	pool := pool.New(cfg, slog.With(slog.Int("worker", 1)))
 	storage := &mockstorage{db: make(map[string]int)}
-	storage.db["123"] = 1
+	storage.db["123"] = 10
 
-	limiterpool := limiter.NewLimiterPool(ctx, storage, func(ctx context.Context, ratePerSec int) limiter.Limiter {
-		return tokenbucket.New(ctx, ratePerSec)
-	})
-	app := app.New(cfg, pool, app.WithLimiter(limiterpool, func(r *http.Request) string {
-		key := r.Header.Get("X-API-Key")
-		slog.Debug("api key from request", slog.String("key", key))
-		return key
-	}))
+	opts := make([]app.AppOptFn, 0, 2)
+	if cfg.Config().Limiter.Enabled {
+
+		slog.Info("limiter enabled")
+
+		limiterOpts := make([]limiter.LimiterPoolOpt, 0, 2)
+		if cfg.Config().Limiter.DefaultRPS != 0 {
+			slog.Info("default limiter enabled", slog.Int("requests_per_second", cfg.Config().Limiter.DefaultRPS))
+			limiterOpts = append(
+				limiterOpts,
+				limiter.WithDefaultLimiter(
+					tokenbucket.New(ctx, cfg.Config().Limiter.DefaultRPS),
+				),
+			)
+		}
+		limiterpool := limiter.NewLimiterPool(ctx, storage, func(ctx context.Context, ratePerSec int) limiter.Limiter {
+			return tokenbucket.New(ctx, ratePerSec)
+		}, limiterOpts...)
+
+		limiterOpt := app.WithLimiter(limiterpool, func(r *http.Request) string {
+			key := r.Header.Get("X-API-Key")
+			slog.Debug("api key from request", slog.String("key", key))
+			return key
+		})
+		opts = append(opts, limiterOpt)
+	}
+
+	app := app.New(cfg, pool, opts...)
 
 	go func() {
 		app.Run(ctx)

@@ -8,7 +8,11 @@
         "http://localhost:5003"
     ],
     "limiter": {
-        "enabled": true,
-        "defaultRPS": 1
+        "enabled": true
+    },
+    "redis": {
+        "host": "localhost",
+        "port": 6379,
+        "password": ""
     }
 }

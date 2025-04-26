@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"log"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,6 +17,8 @@ import (
 	"github.com/tehrelt/eginx/internal/limiter"
 	"github.com/tehrelt/eginx/internal/limiter/tokenbucket"
 	"github.com/tehrelt/eginx/internal/pool"
+	"github.com/tehrelt/eginx/internal/storage"
+	"github.com/tehrelt/eginx/internal/storage/clientstorage"
 )
 
 var (
@@ -56,13 +59,17 @@ func main() {
 
 	cfg, err := config.Parse(ctx, configPath)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 
 	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
 	pool := pool.New(cfg, slog.With(slog.Int("worker", 1)))
-	storage := &mockstorage{db: make(map[string]int)}
-	storage.db["123"] = 10
+	db, err := storage.NewRedis(ctx, cfg.Config().Redis.ConnectionString())
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	storage := clientstorage.New(db)
 
 	opts := make([]app.AppOptFn, 0, 2)
 	if cfg.Config().Limiter.Enabled {

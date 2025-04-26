@@ -1,0 +1,13 @@
+services:
+  redis:
+    image: redis:7.2.4-alpine
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - redis-data:/data
+    ports:
+      - 6379:6379
+
+volumes:
+  redis-data:

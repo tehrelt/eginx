@@ -17,6 +17,17 @@ type Config struct {
 		Enabled    bool `json:"enabled"`
 		DefaultRPS int  `json:"defaultRPS"`
 	} `json:"limiter"`
+	Redis Redis `json:"redis"`
+}
+
+type Redis struct {
+	Host string `json:"host"`
+	Port int    `json:"port"`
+	Pass string `json:"pass"`
+}
+
+func (r *Redis) ConnectionString() string {
+	return fmt.Sprintf("redis://%s:%s@%s:%d", r.Host, r.Pass, r.Host, r.Port)
 }
 
 func (c *Config) reload(path string) error {

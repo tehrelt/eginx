@@ -2,15 +2,18 @@ package tokenbucket
 
 import (
 	"context"
+	"log/slog"
 	"time"
 )
 
-type tokenBucketLimiter struct {
+type tokenBucket struct {
 	bucket chan struct{}
 }
 
-func NewTokenBucket(ctx context.Context, capacity int, period time.Duration) *tokenBucketLimiter {
-	l := &tokenBucketLimiter{
+func New(ctx context.Context, ratePerSec int) *tokenBucket {
+
+	capacity := ratePerSec
+	l := &tokenBucket{
 		bucket: make(chan struct{}, capacity),
 	}
 
@@ -18,32 +21,36 @@ func NewTokenBucket(ctx context.Context, capacity int, period time.Duration) *to
 		l.bucket <- struct{}{}
 	}
 
-	interval := time.Duration(period.Nanoseconds() / int64(capacity))
-	go l.replenishCycle(ctx, interval)
+	go l.replenishCycle(ctx, time.Duration(time.Second.Nanoseconds()/int64(ratePerSec)))
 
 	return l
 }
 
-func (l *tokenBucketLimiter) replenishCycle(ctx context.Context, interval time.Duration) {
+func (l *tokenBucket) replenishCycle(ctx context.Context, interval time.Duration) {
 	t := time.NewTicker(interval)
 	defer t.Stop()
+
+	slog.Debug("replenish cycle started", slog.Int64("interval_ms", interval.Milliseconds()))
 
 	for {
 		select {
 		case <-ctx.Done():
+			slog.Debug("limiter closed")
 			return
 		case <-t.C:
 			select {
 			case l.bucket <- struct{}{}:
+				slog.Debug("replenish bucket")
 			default:
 			}
 		}
 	}
 }
 
-func (l *tokenBucketLimiter) Allow() bool {
+func (l *tokenBucket) Allow() bool {
 	select {
 	case <-l.bucket:
+		slog.Debug("acquiring token")
 		return true
 	default:
 		return false

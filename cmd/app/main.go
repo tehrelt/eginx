@@ -2,16 +2,20 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 
+	"github.com/tehrelt/eginx/internal/app"
 	"github.com/tehrelt/eginx/internal/config"
+	"github.com/tehrelt/eginx/internal/limiter"
+	"github.com/tehrelt/eginx/internal/limiter/tokenbucket"
 	"github.com/tehrelt/eginx/internal/pool"
-	"github.com/tehrelt/eginx/internal/router"
 )
 
 var (
@@ -20,6 +24,22 @@ var (
 
 func init() {
 	flag.StringVar(&configPath, "config", "./config.json", "path to config file")
+}
+
+type mockstorage struct {
+	db map[string]int
+	m  sync.Mutex
+}
+
+func (s *mockstorage) Get(_ context.Context, key string) (int, error) {
+	s.m.Lock()
+	defer s.m.Unlock()
+
+	if rate, ok := s.db[key]; ok {
+		return rate, nil
+	}
+
+	return 0, errors.New("not found")
 }
 
 func main() {
@@ -40,28 +60,26 @@ func main() {
 	}
 
 	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
-	router := router.New(router.Config{
-		Port: cfg.Config().Port,
-	})
-
 	pool := pool.New(cfg, slog.With(slog.Int("worker", 1)))
+	storage := &mockstorage{db: make(map[string]int)}
+	storage.db["123"] = 1
 
-	router.Use(func(w http.ResponseWriter, r *http.Request) error {
-		w.Header().Add("Through-Middleware", "true")
-		return nil
+	limiterpool := limiter.NewLimiterPool(ctx, storage, func(ctx context.Context, ratePerSec int) limiter.Limiter {
+		return tokenbucket.New(ctx, ratePerSec)
 	})
-
-	router.Use(pool.Serve(ctx))
+	app := app.New(cfg, pool, app.WithLimiter(limiterpool, func(r *http.Request) string {
+		key := r.Header.Get("X-API-Key")
+		slog.Debug("api key from request", slog.String("key", key))
+		return key
+	}))
 
 	go func() {
-		router.Run(ctx)
+		app.Run(ctx)
 	}()
-
 	<-ctx.Done()
-	ctx = context.Background()
 
-	if err := router.Shutdown(ctx); err != nil {
+	ctx = context.Background()
+	if err := app.Shutdown(ctx); err != nil {
 		panic(err)
 	}
-
 }

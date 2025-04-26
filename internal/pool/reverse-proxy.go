@@ -2,10 +2,13 @@ package pool
 
 import (
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+
+	"github.com/tehrelt/eginx/internal/router"
 )
 
 const (
@@ -14,11 +17,6 @@ const (
 
 type reverseProxy struct {
 	*httputil.ReverseProxy
-}
-
-type ErrorResponse struct {
-	Code    int    `json:"code"`
-	Message string `json:"message"`
 }
 
 func newRP(target *url.URL) *reverseProxy {
@@ -37,7 +35,7 @@ func newRP(target *url.URL) *reverseProxy {
 			ErrorHandler: func(w http.ResponseWriter, req *http.Request, err error) {
 				slog.Debug("proxy error", slog.Any("error", err))
 
-				resp := &ErrorResponse{Code: http.StatusBadGateway, Message: "Bad Gateway"}
+				resp := router.NewError(errors.New("bad gateway"), http.StatusBadGateway)
 
 				w.WriteHeader(resp.Code)
 				w.Header().Set("Content-Type", "application/json")

@@ -4,12 +4,14 @@ import (
 	"context"
 	"flag"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 
 	"github.com/tehrelt/eginx/internal/config"
 	"github.com/tehrelt/eginx/internal/pool"
+	"github.com/tehrelt/eginx/internal/router"
 )
 
 var (
@@ -38,15 +40,27 @@ func main() {
 	}
 
 	ctx, _ = signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	router := router.New(router.Config{
+		Port: cfg.Config().Port,
+	})
+
 	pool := pool.New(cfg, slog.With(slog.Int("worker", 1)))
+
+	router.Use(func(w http.ResponseWriter, r *http.Request) error {
+		w.Header().Add("Through-Middleware", "true")
+		return nil
+	})
+
+	router.Use(pool.Serve(ctx))
+
 	go func() {
-		pool.Run(ctx)
+		router.Run(ctx)
 	}()
 
 	<-ctx.Done()
 	ctx = context.Background()
 
-	if err := pool.Shutdown(ctx); err != nil {
+	if err := router.Shutdown(ctx); err != nil {
 		panic(err)
 	}
 

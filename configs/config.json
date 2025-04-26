@@ -6,10 +6,9 @@
         "http://localhost:5002",
         "http://localhost:5003",
         "http://localhost:5004",
+        "http://localhost:5006",
         "http://localhost:5005"
+        
     ],
-    "version": "0.0.1",
-    "workerPool": {
-        "count": 10
-    }
+    "version": "0.0.1"
 }

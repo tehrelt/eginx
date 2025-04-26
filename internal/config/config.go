@@ -5,18 +5,35 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"time"
 )
 
 type Config struct {
-	Port       int      `json:"port"`
-	Targets    []string `json:"targets"`
-	Version    string   `json:"version"`
-	WorkerPool struct {
-		Count int `json:"count"`
-	} `json:"workerPool"`
+	Port    int      `json:"port"`
+	Targets []string `json:"targets"`
+	Version string   `json:"version"`
 }
 
-func Parse(filePath string) (cfg Config, err error) {
+func (c *Config) reload(path string) error {
+	cfg, err := parse(path)
+	if err != nil {
+		return err
+	}
+
+	*c = *cfg
+	return nil
+}
+
+func Parse(path string) (*Manager, error) {
+	cfg, err := parse(path)
+	if err != nil {
+		return nil, err
+	}
+
+	return newManager(cfg, time.Second, path), nil
+}
+
+func parse(filePath string) (cfg *Config, err error) {
 
 	f, err := os.Open(filePath)
 	if err != nil {

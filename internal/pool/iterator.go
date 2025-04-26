@@ -3,15 +3,15 @@ package pool
 import "sync"
 
 type serverIterator struct {
-	servers []*Server
-	serverx int
-	m       sync.Mutex
+	buf []*Server
+	x   int
+	m   sync.Mutex
 }
 
 func newServerIterator(servers []*Server) *serverIterator {
 	return &serverIterator{
-		servers: servers,
-		serverx: 0,
+		buf: servers,
+		x:   0,
 	}
 }
 
@@ -21,7 +21,7 @@ func (si *serverIterator) Next() (*Server, bool) {
 	var server *Server
 
 	for server == nil {
-		s := si.servers[si.serverx]
+		s := si.buf[si.x]
 		if s.Alive() {
 			server = s
 		}
@@ -33,8 +33,19 @@ func (si *serverIterator) Next() (*Server, bool) {
 }
 
 func (si *serverIterator) Inc() {
-	si.serverx++
-	if si.serverx == len(si.servers) {
-		si.serverx = 0
+	si.x++
+	if si.x == len(si.buf) {
+		si.x = 0
 	}
+}
+
+func (si *serverIterator) Set(s []*Server) {
+	si.m.Lock()
+	defer si.m.Unlock()
+
+	for _, srv := range si.buf {
+		srv.health.Stop()
+	}
+
+	si.buf = s
 }

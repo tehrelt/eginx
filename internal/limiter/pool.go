@@ -2,6 +2,7 @@ package limiter
 
 import (
 	"context"
+	"sync"
 )
 
 type KeyStorage interface {
@@ -16,6 +17,7 @@ type limiterPool struct {
 	storage        KeyStorage
 	create         LimiterCreatorFn
 	defaultLimiter Limiter
+	m              sync.Mutex
 }
 
 type LimiterPoolOpt func(*limiterPool)
@@ -43,18 +45,36 @@ func (lp *limiterPool) Allow(ctx context.Context, key string) bool {
 }
 
 func (lp *limiterPool) get(ctx context.Context, key string) Limiter {
+	lp.m.Lock()
 	limiter, ok := lp.pool[key]
+	lp.m.Unlock()
+
 	if !ok {
 		rate, err := lp.storage.Get(ctx, key)
 		if err != nil {
 			if lp.defaultLimiter == nil {
 				return nil
 			}
+
 			return lp.defaultLimiter
 		}
 
 		limiter = lp.create(lp.ctx, rate)
+		lp.m.Lock()
 		lp.pool[key] = limiter
+		lp.m.Unlock()
+	} else {
+		rate, err := lp.storage.Get(ctx, key)
+		if err != nil {
+			return lp.defaultLimiter
+		}
+
+		if rate != limiter.Capacity() {
+			limiter = lp.create(lp.ctx, rate)
+			lp.m.Lock()
+			lp.pool[key] = limiter
+			lp.m.Unlock()
+		}
 	}
 
 	return limiter

@@ -7,14 +7,16 @@ import (
 )
 
 type tokenBucket struct {
-	bucket chan struct{}
+	bucket   chan struct{}
+	capacity int
 }
 
 func New(ctx context.Context, ratePerSec int) *tokenBucket {
 
 	capacity := ratePerSec
 	l := &tokenBucket{
-		bucket: make(chan struct{}, capacity),
+		bucket:   make(chan struct{}, capacity),
+		capacity: capacity,
 	}
 
 	for range capacity {
@@ -55,4 +57,7 @@ func (l *tokenBucket) Allow() bool {
 	default:
 		return false
 	}
+}
+func (l *tokenBucket) Capacity() int {
+	return l.capacity
 }

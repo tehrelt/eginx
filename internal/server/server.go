@@ -83,6 +83,12 @@ func (s *server) handle(w http.ResponseWriter, r *http.Request) {
 		Server: s.port,
 	}
 
+	ok(data, w)
+}
+
+func ok(data any, w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+
 	if err := json.NewEncoder(w).Encode(data); err != nil {
 		fmt.Println(err)
 	}

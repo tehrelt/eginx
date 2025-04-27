@@ -28,7 +28,6 @@ func newRP(target *url.URL) *reverseProxy {
 				req.URL.Path = target.Path + req.URL.Path
 			},
 			ModifyResponse: func(resp *http.Response) error {
-				resp.Header.Set("X-Forwarded-By", forwardedBy)
 				resp.Header.Set("X-Forwarded-For", target.String())
 				return nil
 			},
@@ -39,7 +38,6 @@ func newRP(target *url.URL) *reverseProxy {
 
 				w.WriteHeader(resp.Code)
 				w.Header().Set("Content-Type", "application/json")
-				w.Header().Set("X-Forwarded-By", forwardedBy)
 				w.Header().Set("X-Forwarded-For", target.String())
 
 				if err := json.NewEncoder(w).Encode(resp); err != nil {

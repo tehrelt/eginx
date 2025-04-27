@@ -81,3 +81,6 @@ docker compose up -d --build
 - Backend (5 instances) - 5000-5004 порты
 
 
+## Тесты
+
+[Результат Apache Bench (n=5000 c=1000)](./tests/apache-bench/n5000c1000.log)

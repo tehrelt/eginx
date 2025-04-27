@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"time"
 )
 
 var (
@@ -27,8 +28,8 @@ func main() {
 		panic("invalid args")
 	}
 
-	counter := make(map[int]int)
-	counter[0] = 0
+	counter := make(map[string]int)
+	counter["error"] = 0
 	mutex := sync.Mutex{}
 	wg := sync.WaitGroup{}
 
@@ -41,7 +42,7 @@ func main() {
 			defer wg.Done()
 			l := slog.With(slog.Int("worker", x))
 			for range ch {
-				l.Info("requesting", slog.String("target", target))
+				l.Debug("requesting", slog.String("target", target))
 
 				req, err := http.NewRequest(http.MethodGet, target, nil)
 				if err != nil {
@@ -57,16 +58,20 @@ func main() {
 					continue
 				}
 
+				server := response.Header.Get("X-Forwarded-For")
+
 				if response.StatusCode != http.StatusOK {
 					l.Error("failed request", slog.Int("status", response.StatusCode))
-					v := counter[0] + 1
-					counter[0] = v
+					mutex.Lock()
+					v := counter["error"] + 1
+					counter["error"] = v
+					mutex.Unlock()
 
 					continue
 				}
 
 				res := struct {
-					Server int `json:"server"`
+					Server string `json:"server"`
 				}{}
 
 				if err := json.NewDecoder(response.Body).Decode(&res); err != nil {
@@ -75,25 +80,27 @@ func main() {
 				}
 
 				mutex.Lock()
-				v, ok := counter[res.Server]
+				v, ok := counter[server]
 				if !ok {
-					counter[res.Server] = 1
+					counter[server] = 1
 				} else {
-					counter[res.Server] = v + 1
+					counter[server] = v + 1
 				}
 				mutex.Unlock()
 			}
 		}(i)
 	}
 
+	start := time.Now()
 	for range count {
 		ch <- struct{}{}
 	}
 	close(ch)
-
 	wg.Wait()
+	elapsed := time.Since(start)
 
+	slog.Info("requests done", slog.Duration("elapsed", elapsed))
 	for key, value := range counter {
-		slog.Info("result", slog.Int("server", key), slog.Int("count", value))
+		slog.Info("result", slog.String("server", key), slog.Int("count", value))
 	}
 }

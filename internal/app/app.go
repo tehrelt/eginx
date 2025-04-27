@@ -9,6 +9,8 @@ import (
 	"github.com/tehrelt/eginx/internal/router"
 )
 
+const serverName = "eginx"
+
 type App struct {
 	cfg     *config.Manager
 	router  *router.Router
@@ -44,7 +46,7 @@ func New(cfg *config.Manager, pool *pool.ServerPool, opts ...AppOptFn) *App {
 }
 
 func (a *App) setup(ctx context.Context) {
-
+	a.router.Use(serverNameMiddleware(a.cfg.Config().Version))
 	if a.limiter != nil {
 		a.logger.Info("enabling limiter middleware", slog.Any("limiterConfig", a.limiter))
 		a.router.Use(limiterMiddleware(a.limiter))

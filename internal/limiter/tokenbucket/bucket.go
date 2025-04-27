@@ -11,7 +11,7 @@ type bucket struct {
 	rpm    int
 }
 
-func newBucket(ctx context.Context, rpm int) *bucket {
+func NewBucket(ctx context.Context, rpm int) *bucket {
 	l := &bucket{
 		bucket: make(chan struct{}, rpm),
 		rpm:    rpm,

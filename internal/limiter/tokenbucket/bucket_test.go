@@ -10,35 +10,38 @@ import (
 
 func TestAllowed(t *testing.T) {
 	ctx := t.Context()
-	limiter := tokenbucket.New(ctx, 10)
+	bucket := tokenbucket.NewBucket(ctx, 10)
 
 	for i := 0; i < 10; i++ {
-		allowed := limiter.Allow()
+		allowed := bucket.Allow()
 		require.Equal(t, true, allowed)
 	}
 }
 
 func TestForbidden(t *testing.T) {
 	ctx := t.Context()
-	limiter := tokenbucket.New(ctx, 1)
+	bucket := tokenbucket.NewBucket(ctx, 1)
 
-	allowed := limiter.Allow()
+	allowed := bucket.Allow()
 	require.Equal(t, true, allowed)
-	allowed = limiter.Allow()
+	allowed = bucket.Allow()
 	require.Equal(t, false, allowed)
 }
 
 func TestAllowAfterForbid(t *testing.T) {
 	ctx := t.Context()
-	l := tokenbucket.New(ctx, 1)
+	n := 120
+	bucket := tokenbucket.NewBucket(ctx, n)
 
-	allowed := l.Allow()
-	require.Equal(t, true, allowed)
+	actual := false
+	expected := true
 
-	allowed = l.Allow()
-	require.Equal(t, false, allowed)
+	for range n + 1 {
+		actual = bucket.Allow()
+	}
+	require.Equal(t, false, actual)
 	time.Sleep(time.Second)
 
-	allowed = l.Allow()
-	require.Equal(t, true, allowed)
+	actual = bucket.Allow()
+	require.Equal(t, expected, actual)
 }

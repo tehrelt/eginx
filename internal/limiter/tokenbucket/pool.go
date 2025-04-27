@@ -48,7 +48,7 @@ type TokenBucketOpt func(*TokenBucket)
 
 func WithDefaultBucket(ctx context.Context, rate int) TokenBucketOpt {
 	return func(tb *TokenBucket) {
-		tb.defaultBucket = newBucket(ctx, rate)
+		tb.defaultBucket = NewBucket(ctx, rate)
 	}
 }
 
@@ -107,5 +107,5 @@ func (tb *TokenBucket) get(ctx context.Context, key string) (*bucket, error) {
 }
 
 func (tb *TokenBucket) newBucket(rate int) *bucket {
-	return newBucket(tb.mainCtx, rate)
+	return NewBucket(tb.mainCtx, rate)
 }

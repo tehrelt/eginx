@@ -8,12 +8,14 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"os"
 )
 
 type server struct {
-	server *http.Server
-	port   int
-	logger *slog.Logger
+	server   *http.Server
+	port     int
+	logger   *slog.Logger
+	hostname string
 }
 
 func New(port int) *server {
@@ -31,6 +33,13 @@ func (s *server) Run() error {
 	}()
 
 	addr := fmt.Sprintf(":%d", s.port)
+
+	hostname, err := os.Hostname()
+	if err != nil {
+		return err
+	}
+
+	s.hostname = hostname
 
 	s.logger.Info("binding", slog.String("addr", addr))
 	listener, err := net.Listen("tcp", addr)
@@ -78,9 +87,9 @@ func (s *server) Shutdown(ctx context.Context) error {
 func (s *server) handle(w http.ResponseWriter, r *http.Request) {
 	s.logger.Info("incoming request")
 	data := struct {
-		Server int `json:"server"`
+		Server string `json:"server"`
 	}{
-		Server: s.port,
+		Server: fmt.Sprintf("%s:%d", s.hostname, s.port),
 	}
 
 	ok(data, w)

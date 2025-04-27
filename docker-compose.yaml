@@ -9,5 +9,62 @@ services:
     ports:
       - 6379:6379
 
+  eginx:
+    build:
+      context: .
+      dockerfile: ./deploy/eginx.Dockerfile
+      args:
+        config: ./configs/config.container.json
+    ports:
+      - 8080:8080
+    volumes:
+      - "./configs/config.container.json:/app/config.json"
+
+  api:
+    build:
+      context: .
+      dockerfile: ./deploy/api.Dockerfile
+      args:
+        config: ./configs/config.container.json
+    ports:
+      - 7000:7000
+    volumes:
+      - "./configs/config.container.json:/app/config.json"
+
+  backend-1:
+    build:
+      context: .
+      dockerfile: ./deploy/backend.Dockerfile
+    ports:
+      - 5000:5000
+
+  backend-2:
+    build:
+      context: .
+      dockerfile: ./deploy/backend.Dockerfile
+    ports:
+      - 5001:5000
+
+  backend-3:
+    build:
+      context: .
+      dockerfile: ./deploy/backend.Dockerfile
+    ports:
+      - 5002:5000
+
+  backend-4:
+    build:
+      context: .
+      dockerfile: ./deploy/backend.Dockerfile
+    ports:
+      - 5003:5000
+
+  backend-5:
+    build:
+      context: .
+      dockerfile: ./deploy/backend.Dockerfile
+    ports:
+      - 5004:5000
+
 volumes:
   redis-data:

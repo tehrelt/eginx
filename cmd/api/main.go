@@ -29,14 +29,11 @@ var (
 )
 
 func init() {
-	flag.StringVar(&configPath, "config", "", "path to config file")
+	flag.StringVar(&configPath, "config", "./config.json", "path to config file")
 }
 
 func main() {
 	flag.Parse()
-	if configPath == "" {
-		log.Fatal("config path is required")
-	}
 
 	ctx := context.Background()
 	cfg, err := config.Parse(ctx, configPath)

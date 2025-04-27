@@ -1,0 +1,20 @@
+{
+    "version": "0.0.1",
+    "port": 8080,
+    "targets": [
+        "http://backend-1:5000",
+        "http://backend-2:5000",
+        "http://backend-3:5000",
+        "http://backend-4:5000",
+        "http://backend-5:5000"
+    ],
+    "limiter": {
+        "enabled": true,
+        "defaultRPM": 4
+    },
+    "redis": {
+        "host": "redis",
+        "port": 6379,
+        "password": ""
+    }
+}

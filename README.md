@@ -83,4 +83,6 @@ docker compose up -d --build
 
 ## Тесты
 
-[Результат Apache Bench (n=5000 c=1000)](./tests/apache-bench/n5000c1000.log)
+Результат Apache Bench: 
+- [n=5'000 c=1'000](./tests/apache-bench/n5000c1000.log)
+- [n=100'000 c=1'000](./tests/apache-bench/n100000c1000.log)

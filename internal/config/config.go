@@ -15,7 +15,7 @@ type Config struct {
 	Version string   `json:"version"`
 	Limiter struct {
 		Enabled    bool `json:"enabled"`
-		DefaultRPS int  `json:"defaultRPS"`
+		DefaultRPM int  `json:"defaultRPM"`
 	} `json:"limiter"`
 	Redis Redis `json:"redis"`
 }

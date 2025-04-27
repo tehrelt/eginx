@@ -6,7 +6,6 @@ import (
 	"flag"
 	"log"
 	"log/slog"
-	"net/http"
 	"os"
 	"os/signal"
 	"sync"
@@ -14,7 +13,6 @@ import (
 
 	"github.com/tehrelt/eginx/internal/app"
 	"github.com/tehrelt/eginx/internal/config"
-	"github.com/tehrelt/eginx/internal/limiter"
 	"github.com/tehrelt/eginx/internal/limiter/tokenbucket"
 	"github.com/tehrelt/eginx/internal/pool"
 	"github.com/tehrelt/eginx/internal/storage"
@@ -76,25 +74,20 @@ func main() {
 
 		slog.Info("limiter enabled")
 
-		limiterOpts := make([]limiter.LimiterPoolOpt, 0, 2)
-		if cfg.Config().Limiter.DefaultRPS != 0 {
-			slog.Info("default limiter enabled", slog.Int("requests_per_second", cfg.Config().Limiter.DefaultRPS))
+		limiterOpts := make([]tokenbucket.TokenBucketOpt, 0, 2)
+
+		defaultRpm := cfg.Config().Limiter.DefaultRPM
+		if defaultRpm != 0 {
+			slog.Info("default limiter enabled", slog.Int("rpm", defaultRpm))
+
 			limiterOpts = append(
 				limiterOpts,
-				limiter.WithDefaultLimiter(
-					tokenbucket.New(ctx, cfg.Config().Limiter.DefaultRPS),
-				),
+				tokenbucket.WithDefaultBucket(ctx, defaultRpm),
 			)
 		}
-		limiterpool := limiter.NewLimiterPool(ctx, storage, func(ctx context.Context, ratePerSec int) limiter.Limiter {
-			return tokenbucket.New(ctx, ratePerSec)
-		}, limiterOpts...)
 
-		limiterOpt := app.WithLimiter(limiterpool, func(r *http.Request) string {
-			key := r.Header.Get("X-API-Key")
-			slog.Debug("api key from request", slog.String("key", key))
-			return key
-		})
+		bucketpool := tokenbucket.NewTokenBucket(ctx, storage, limiterOpts...)
+		limiterOpt := app.WithLimiter(bucketpool, "X-API-Key")
 		opts = append(opts, limiterOpt)
 	}
 

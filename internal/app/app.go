@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/tehrelt/eginx/internal/config"
 	"github.com/tehrelt/eginx/internal/pool"
@@ -9,9 +10,11 @@ import (
 )
 
 type App struct {
-	cfg    *config.Manager
-	router *router.Router
-	pool   *pool.ServerPool
+	cfg     *config.Manager
+	router  *router.Router
+	pool    *pool.ServerPool
+	limiter *limiterHeader
+	logger  *slog.Logger
 }
 
 func (a *App) Shutdown(ctx context.Context) any {
@@ -30,6 +33,7 @@ func New(cfg *config.Manager, pool *pool.ServerPool, opts ...AppOptFn) *App {
 		cfg:    cfg,
 		router: router,
 		pool:   pool,
+		logger: slog.With(slog.String("struct", "App")),
 	}
 
 	for _, opt := range opts {
@@ -40,6 +44,12 @@ func New(cfg *config.Manager, pool *pool.ServerPool, opts ...AppOptFn) *App {
 }
 
 func (a *App) setup(ctx context.Context) {
+
+	if a.limiter != nil {
+		a.logger.Info("enabling limiter middleware", slog.Any("limiterConfig", a.limiter))
+		a.router.Use(limiterMiddleware(a.limiter))
+	}
+
 	a.router.Use(a.pool.Serve(ctx))
 }
 

@@ -3,31 +3,24 @@ package app
 import (
 	"context"
 	"errors"
-	"net/http"
-
-	"github.com/tehrelt/eginx/internal/router"
 )
 
-type LimiterPool interface {
+type Limiter interface {
 	Allow(context.Context, string) bool
 }
 
-type GetKeyFn func(r *http.Request) string
+type limiterHeader struct {
+	Limiter
+	header string
+}
 
 var errTooManyRequests = errors.New("too many requests")
 
-func WithLimiter(limiter LimiterPool, getKey GetKeyFn) AppOptFn {
+func WithLimiter(limiter Limiter, header string) AppOptFn {
 	return func(a *App) {
-		a.router.Use(
-			func(w http.ResponseWriter, r *http.Request) error {
-				key := getKey(r)
-
-				if !limiter.Allow(r.Context(), key) {
-					return router.NewError(errTooManyRequests, http.StatusTooManyRequests)
-				}
-
-				return nil
-			},
-		)
+		a.limiter = &limiterHeader{
+			Limiter: limiter,
+			header:  header,
+		}
 	}
 }
